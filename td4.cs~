@@ -1,0 +1,21 @@
+(********* Exercice  2  *********)
+ 
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+class Program {
+  private static List<string> people = new List<string>() 
+  { 
+    "Robert", "Roger", "Raymond", "Remi", 
+    "Radicowl", "Ross", "Rififi", "Rossinante" 
+  };
+
+  public static void Main() 
+  {
+    IEnumerable<string> query = from p in people select p;
+    Console.WriteLine("------");
+    foreach (string person in query) 
+        Console.WriteLine(person);
+  }
+}

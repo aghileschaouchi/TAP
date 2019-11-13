@@ -1,0 +1,42 @@
+let triplet x y z =
+  y;;
+(* *)
+let addone (x) = 
+  x+1;;
+  
+let curry f =
+     fun x y -> f (x, y) ;;
+  
+let uncurry f =
+  fun (y ,x) -> f y x ;;
+
+(* 1.3 *)
+let inverse f x=
+    fun g -> f g x;;
+
+ (*1.4*)
+let rec iterate f x n =
+  if n=0 then
+    x
+  else
+    iterate f (f x) (n-1) ;;
+
+(*exercice 2*)
+  (*2.1*)
+let lmap = [(1,2)];;
+
+  
+(*2.2*)
+let rec length list =
+  if list = [] then
+    0
+  else
+    1 + length(list.tl);;
+  
+let insertlist lmap k v =
+   let lmap = lmap @ [(k,v)] in lmap;;
+    
+(*let list_remove key list ;;*)
+    
+  (*2.3*)
+

@@ -1,0 +1,1008 @@
+(**************************************************************)
+(* Chapitre 8 de 
+   Programmation fonctionnelle, générique et objet
+   (Une introduction avec le langage OCaml)
+   Ph. Narbel,  Vuibert, 2005
+ 
+   Ces programmes ont pour but d'illustrer les sujets traités dans 
+   le livre. Il n'est donné aucune garantie quant à leur utilisation 
+   dans le cadre d'une activité professionnelle ou commerciale.
+   Ces programmes peuvent être copiés sous reserve que leur provenance
+   soit citée et que cet avertissement soit inclus.   
+
+   These programs are provided without warranty of any kind. Their 
+   purpose is just to serve as illustrations in the book.  Permission
+   to copy is granted provided that citation and this disclaimer of 
+   warranty are included.
+
+*)
+
+
+  type 'a sequence = Seq of 'a array;;
+
+  let seq_wordlist (Seq s) word_len = 
+    let max_index = (Array.length s) - word_len + 1 in
+    let rec aux set n = 
+      if n >= max_index then set 
+      else let subseq = Array.sub s n word_len in
+           if List.mem subseq set 
+             then aux set (n + 1) 
+             else aux (subseq :: set) (n + 1) 
+      in
+      aux [] 0;;
+
+  let seq_constant el len = Seq (Array.make len el);;
+
+  type 'a interval = Interval of 'a * 'a;;
+
+  let seq_random (Interval (min, max)) len =
+    let interv = max - min + 1 in
+    let init = Random.self_init (); (Random.int interv) + min in 
+    Seq (Array.init len (fun x -> (Random.int interv) + min));;
+
+  let complexity_fun seq =
+    fun n -> List.length (seq_wordlist seq n);;
+
+  let rec assoc_of_fun f (Interval (n, m)) = 
+    if n > m then []  
+    else (n, f n) :: (assoc_of_fun f (Interval (n + 1, m)));;
+
+  let assoc_print l = 
+    List.iter (fun (n, fn) -> 
+      (Printf.printf "n = %d: f(n) = %d \n" n fn)) l;;
+
+  type 'a seq_builder = Seq_Builder of (int -> 'a sequence);;
+
+
+  let seq_complexity_print (Seq_Builder s) len m = 
+    assoc_print (assoc_of_fun 
+                   (complexity_fun 
+                      (s len))
+                   (Interval (1, m)));;
+
+
+  type 'a subst = Subst of ('a * 'a array) list;;
+
+  let subst_apply (Subst s) (Seq seq) =
+    Seq (Array.concat
+           (List.map (fun x -> List.assoc x s ) 
+              (Array.to_list seq)));;
+
+  let rec iterate f n x =
+    if n = 0 then x else iterate f (n - 1) (f x);;
+
+  let subst_iterate s = iterate (subst_apply s);;
+
+  let rec subst_iterate_until s (Seq start_word as seq) min_len = 
+    if min_len < (Array.length start_word) 
+      then seq
+      else subst_iterate_until s (subst_apply s seq) min_len;;
+
+  let s_dragon = Subst [1, [|1; 2|]; 2, [|3; 2|]; 
+                        3, [|3; 4|]; 4, [|1; 4|] ];;
+
+  type 'a graphic_repres = 
+    Graphic_repres of ('a * (int * int) ) list;;
+
+  let gr = Graphic_repres [1, (1, 0);  2, (0,  1); 
+                           3, (-1, 0); 4, (0, -1)];;
+
+  open Graphics;;
+  let seq_line (Graphic_repres g) (Seq seq) 
+               (start_x, start_y) scale = 
+    moveto start_x start_y;
+    Array.iter (fun x -> let (t1, t2) = List.assoc x g in
+                         rlineto (t1 * scale) (t2 * scale))
+                         seq;;
+
+  Graphics.open_graph "";;
+
+  let start_word = Seq [|1; 2; 3; 4|];;
+  seq_line gr (subst_iterate s_dragon 4 start_word) (120, 250) 20;
+  seq_line gr (subst_iterate s_dragon 8 start_word) (210, 180) 6;
+  seq_line gr (subst_iterate s_dragon 12 start_word) (550, 300) 2;;
+
+
+
+  let sum = List.fold_left ( + ) 0;;
+  let length l = List.fold_left (fun x y -> 1 + x) 0 l;;
+  let flatten l = List.fold_left ( @ ) [] l;;
+  let maximum l = List.fold_left max (List.hd l) l;;
+
+
+  type 'a bintree = 
+    | BinEmpty
+    | BinNode of 'a * 'a bintree * 'a bintree;; 
+
+  let rec bintree_fold f e t = match t with
+    | BinEmpty -> e
+    | BinNode(x,t1,t2) -> f x (bintree_fold f e t1) 
+                              (bintree_fold f e t2);;
+
+  let bintree_sum t = bintree_fold (fun x y z -> x + y + z) 0 t;;
+  let bintree_size t = bintree_fold (fun x y z -> 1 + y + z) 0 t;;
+  let bintree_height t = bintree_fold (fun x y z -> 1 + (max y z)) 0 t;; 
+
+
+  type 'a tree =
+    | TreeEmpty
+    | TreeNode of 'a * 'a tree list;;
+
+  let rec tree_fold f e t = match t with 
+  | TreeEmpty -> e
+  | TreeNode (x, t_list) -> 
+      List.fold_left f x 
+        (List.map (tree_fold f e) t_list);;
+
+  let rec tree_fold g f e t = match t with 
+  | TreeEmpty -> e
+  | TreeNode (x, t_list) -> 
+      g x (List.fold_left f e 
+             (List.map (tree_fold g f e) t_list));;
+
+  let tree_sum t = tree_fold ( + ) ( + ) 0 t;;
+  let tree_size t = tree_fold (fun x y -> 1 + y) ( + ) 0 t;;
+  let tree_height t = tree_fold (fun x y -> 1 + y) max 0 t;;
+  let rec tree_size t = match t with
+  | TreeEmpty -> 0
+  | TreeNode (_, t_list) -> 1 + 
+         (List.fold_left ( + ) 0 (List.map tree_size t_list));;
+
+
+
+  type 'k key = K of 'k
+  and ('k, 'a) vertex = 'k key * 'a 
+  and ('k, 'a) graph = Graph of (('k, 'a) vertex * 'k key list) list;;
+
+  let g1 = Graph 
+    [((K 1, "One"),   [K 5; K 2]); ((K 2, "Two"),  [K 1; K 3]); 
+     ((K 3, "Three"), [K 2; K 4]); ((K 4, "Four"), [K 3; K 5]);
+     ((K 5, "Five"),  [K 4; K 1]); ];;
+
+  let graph_nexts (Graph adj) key = 
+      List.assoc key (List.map (fun ((k, _), a) -> (k, a)) adj);;
+
+  let list_of_graph_breadth g key_start = 
+    let rec aux to_visit visited = match to_visit with
+    | [] -> List.rev visited
+    | k :: ks -> if List.mem k visited 
+       then aux ks visited 
+       else aux (ks @ (graph_nexts g k)) (k :: visited)
+    in 
+    aux [key_start] [];;
+
+  type 'a strategy = 
+    Strategy of ('a -> 'a list -> 'a list -> 'a list);;
+
+  let list_of_graph (Strategy strat) g key_start = 
+    let rec aux to_visit visited = match to_visit with
+    | [] -> List.rev visited
+    | k :: ks -> if List.mem k visited 
+       then aux ks visited 
+       else aux (strat k (graph_nexts g k) ks) (k :: visited)
+    in 
+    aux [key_start] [];;
+
+  let list_of_graph_breadth g key_start = 
+    list_of_graph 
+      (Strategy (fun _ nexts rest -> rest @ nexts)) g key_start;;
+
+  let list_of_graph_depth g key_start = 
+    list_of_graph 
+      (Strategy (fun _ nexts rest -> nexts @ rest)) g key_start;;
+
+  list_of_graph 
+    (Strategy (fun _ nexts rest -> List.sort compare (rest @ nexts)))
+    g1 (K 1);; 
+
+  let list_of_graph_cond pred g key_start = 
+    list_of_graph
+      (Strategy (fun k nexts rest -> 
+                   if pred k then nexts @ rest 
+                             else rest @ nexts)) 
+      g key_start;;
+
+  let until_reached (Strategy strat) pred g key_start =
+    list_of_graph 
+      (Strategy (fun k nexts rest -> 
+                   if pred k then [] 
+                             else strat k nexts rest))
+      g key_start;;
+
+  let graph_assoc key (Graph adj) = 
+    List.assoc key (List.map fst adj);;
+
+  let until_reached_min ord g key_start = 
+    let less k1 k2 = ord (graph_assoc k1 g) (graph_assoc k2 g) 
+    in
+    until_reached
+      (Strategy (fun _ nexts rest ->  
+                   Sort.list less (nexts @ rest)))
+      (fun k ->                       
+        less k (List.hd (Sort.list less (graph_nexts g k))))
+      g key_start;;
+
+
+  (* Example of p. 262 : *)
+  let graph_of_mat m =
+  let size = Array.length m in 
+  let add1 x = (x + 1) mod size  in
+  let sub1 x = if x = 0 then size - 1 else x - 1 in
+  let l = ref [] in
+  for i = 0 to size - 1 do 
+    for j = 0 to size - 1 do 
+      l := ((K (i, j), m.(i).(j)), 
+            [K (add1 i, j);  K (i, add1 j);
+             K (sub1 i, j);  K (i, sub1 j)]) :: !l
+    done;
+  done;
+  Graph (!l);;
+
+  let fun_to_matrix f size = 
+  let m = Array.create_matrix size size (f 0 0) in 
+  for i=0 to size - 1 do 
+    for j=0 to size - 1 do 
+      m.(i).(j) <- f i j
+    done;
+  done;
+  m;;
+
+  let m = fun_to_matrix (fun x y -> (float x -. 3.)**2. +. 
+                                    (float y -. 3.)**2.) 7;;
+
+  let m' = fun_to_matrix            
+           (let size = 11 in 
+	   fun x y -> 
+	     let center = float (size / 2) in 
+             if sqrt ((float x-.center)**2. +. (float y-.center)**2.) < 3.
+             then (float x -. center)**2. +. (float y -. center)**2.
+             else 20. ) 
+         9;;
+
+  let g = graph_of_mat m';;
+  until_reached_min ( < ) g (K (1, 2));;
+
+
+
+
+  let list_of_struct nexts (Strategy strat) s start = 
+    let rec aux to_visit visited = match to_visit with
+    | [] -> List.rev visited
+    | k :: ks -> if List.mem k visited 
+       then aux ks visited 
+       else aux (strat k (nexts s k) ks) (k :: visited)
+    in 
+    aux [start] [];;
+
+  type 'a tree =
+    | TEmpty
+    | TNode of 'a * 'a tree list;;
+
+  let tree_nexts _ t = match t with
+  | TEmpty -> []
+  | TNode (_, tl) -> tl;;
+
+  let list_of_tree strategy t = 
+    list_of_struct tree_nexts strategy t t;;
+
+  let list_of_tree' strategy t = 
+    List.map     
+      (fun (TNode (x, _)) -> x)      
+      (list_of_struct tree_nexts strategy t t);;
+
+  let rec tree_build f h x = 
+    if h < 0 then TEmpty else
+    if h = 0 then TNode (x, []) 
+    else TNode (x, List.map (tree_build f (h - 1)) (f x));;
+
+  let tree_interv h d = 
+    tree_build (fun x -> list_interv (d * x - d + 2) d) h 1;;
+
+  let t1 = tree_interv 2 3;; 
+  list_of_tree (Strategy (fun _ n r -> r @ n)) t1;;
+
+
+  let rec linear_mem empty hd tl x l =  
+    if l = empty then false 
+    else (hd l = x) || (linear_mem empty hd tl x (tl l));;
+
+  let list_mem x l = linear_mem [] List.hd List.tl x l;;
+
+  let array_mem x a = 
+     linear_mem [||] 
+       (fun a -> a.(0)) 
+       (fun a -> Array.sub a 1 ((Array.length a) - 1)) x a;;
+
+
+
+  type 'a universal = 
+  | Nil                              
+  | Const                            
+  | Value of 'a                      
+  | Rec of 'a universal              
+  | Prod of 'a universal * 'a universal;;
+
+  let rec univ_of_list t = match t with
+  | [] -> Nil  
+  | x :: y -> Prod (Value x, Rec (univ_of_list y));;
+
+  let rec univ_of_bintree t = match t with 
+  | BinEmpty -> Nil 
+  | BinNode (x, t1, t2) -> 
+      Prod (Value x, Prod (Rec (univ_of_bintree t1), 
+                           Rec (univ_of_bintree t2)));;
+
+  type 'a tertree = 
+    | TerEmpty
+    | TerNode of 'a * 'a tertree * 'a tertree * 'a tertree;; 
+
+  let rec univ_of_tertree t = match t with 
+  | TerEmpty -> Nil 
+  | TerNode (x, t1, t2, t3) -> 
+      Prod (Value x, Prod (Prod (Rec (univ_of_tertree t1), 
+                                 Rec (univ_of_tertree t2)), 
+                           Rec (univ_of_tertree t3)));;
+
+  let rec univ_mem e s = match s with
+  | Nil | Const -> false
+  | Value x -> e = x 
+  | Rec s' -> univ_mem e s'
+  | Prod (s', s'') -> (univ_mem e s') || (univ_mem e s'');;
+
+  let rec univ_size s = match s with
+  | Nil | Const -> 0
+  | Value _ -> 1
+  | Rec s' -> univ_size s'
+  | Prod (s', s'') -> (univ_size s') + (univ_size s'');;
+
+
+
+  open Graphics;;
+  let start = -1;;
+  let start_point = (start, start);;
+
+  let full_initialize () =
+    clear_graph (); set_color black; moveto start start;;
+
+  let polyline x y = 
+    if x < 30 && y < 30 then raise Exit else 
+    if current_point () = start_point 
+      then moveto x y 
+      else lineto x y;; 
+
+  type interact_behavior = { 
+    init: unit -> unit; 
+    mouse: int -> int -> unit; }
+
+  let interaction_with_mouse behavior =
+    behavior.init ();
+    while true do
+      let s = wait_next_event [Button_down] in
+      if s.button then behavior.mouse s.mouse_x s.mouse_y
+    done;;
+
+  let polyline_behav = { 
+    init = full_initialize; 
+    mouse = polyline; }
+
+  let draw_polyline () = interaction_with_mouse polyline_behav;;
+
+  let analyze line =
+    let tokens = Str.split (Str.regexp_string " ") line in 
+    match tokens with 
+    | [keyword; x_coord; y_coord] -> 
+         (keyword, (int_of_string x_coord, int_of_string y_coord)) 
+    | _ -> failwith "Bad Format in Script";;
+  
+  let script_for_mouse behavior script_name =
+    behavior.init ();
+    let script = open_in script_name in 
+      while true do
+        let (keyword, (x, y)) = analyze (input_line script) in
+        if keyword = "button_down" then behavior.mouse x y
+      done;;
+
+  let test_draw_polyline test_file = 
+    script_for_mouse polyline_behav test_file;;
+
+
+
+  type ('key, 'action) actions_assoc = 
+    Actions of ('key * 'action) list;;
+
+  type 'a behaviors = 
+    Behav of (char, 'a) actions_assoc;; 
+
+  let start = -1;;
+
+  let full_initialize () =
+    clear_graph (); set_color black; moveto start start;;
+
+  let interaction_with_mouse (Behav (Actions l)) = 
+    full_initialize ();
+    let action_state = ref (snd (List.hd l)) in 
+    while true do
+      let s = wait_next_event [Button_down; Key_pressed] in
+      if s.button then !action_state s.mouse_x s.mouse_y else 
+      if s.keypressed then 
+        try action_state := List.assoc s.key l 
+        with Not_found -> ()
+    done;;
+
+  let graphic_actions1 = Behav (Actions [
+    ('l', fun x y ->  
+            if x < 30 && y < 30 then raise Exit else
+            if current_point () = (start, start) then 
+            moveto x y else lineto x y);
+     ('c', fun x y ->  
+             if x < 30 && y < 30 then raise Exit else
+             moveto x y; draw_circle x y 20)]);;
+
+  let full_draw () = 
+     interaction_with_mouse graphic_actions1;;
+
+
+
+  type 'a set = Set of ('a -> bool);;
+  let set_empty = Set (fun x -> false);;
+  let set_all = Set (fun x -> true);;
+  let one = Set (fun x -> x = 1);;
+  let set_singleton x = Set (fun y -> x = y);;
+  let set_add (Set s) x = Set (fun y -> x = y || s y);;
+  let set_mem (Set s) x = s x;;
+  let out (Set s) = Set (fun y -> not (s y));;
+  let ( +| ) (Set s1) (Set s2) = Set (fun y -> s1 y || s2 y);;  
+  let ( *| ) (Set s1) (Set s2) = Set (fun y -> s1 y && s2 y);; 
+  let greater_than a = Set (fun y -> y > a);;
+  let less_than a = Set (fun y -> y < a);;
+  let interv a b = (greater_than a) *| (less_than b);;
+  let ( +-| ) s1 s2 = (s1 *| (out s2)) +| ((out s1) *| s2);;
+  let xor x y = not (x = y);;
+  let ( +-| ) (Set s1) (Set s2) = Set (fun y -> xor (s1 y) (s2 y));;
+
+  type point2D = Point2D of float * float;;
+
+  let dist_euclid (x, y) (w, z) = 
+    sqrt ((x -. w) ** 2. +. (y -. z) ** 2.);;
+
+  let disk (Point2D (cen_x, cen_y)) radius =
+    Set (fun (Point2D (x, y)) ->
+           dist_euclid  (cen_x, cen_y) (x, y) <= radius);;
+
+  let half_plane_horiz_sup a = Set (fun (Point2D (x, y)) -> y >= a);;
+  let half_plane_horiz_inf a = Set (fun (Point2D (x, y)) -> y <= a);;
+  let half_plane_vertic_left  a = Set (fun (Point2D (x, y)) -> x <= a);;
+  let half_plane_vertic_right a = Set (fun (Point2D (x, y)) -> x >= a);;
+
+  let rectangle (Point2D (x1, y1)) (Point2D (x2, y2)) =  
+    (half_plane_horiz_sup y1) *| (half_plane_horiz_inf y2) *| 
+    (half_plane_vertic_left x2)  *| (half_plane_vertic_right x1);;
+
+  let annulus (Point2D (center_x, center_y) as p) r1 r2 = 
+    (disk p r1) +-| (disk p r2);;
+
+  let set_draw test2D width height s =
+    let im = Array.make_matrix width height Graphics.white in 
+    for i=0 to height - 1 do
+      for j=0 to width - 1 do
+	if (test2D s (j, i))
+        then im.(height - i - 1).(j) <- Graphics.black
+      done
+    done;
+    Graphics.draw_image (Graphics.make_image im) 0 0;;
+
+  let draw = set_draw 
+    (fun s (i, j) -> set_mem s (Point2D (float i, float j))) 200 200;; 
+
+  let disk1 = disk (Point2D (100., 40.)) 30.;;
+  draw disk1;;
+  let disk2 = disk (Point2D (100., 80.)) 40.;;
+  draw disk2;;
+  draw (disk1 +| disk2);;   (* union *)
+  draw (disk1 *| disk2);;   (* intersection *)
+  draw (disk1 +-| disk2);;  (* ou exclusif *)
+
+  let translate deltax deltay = 
+    fun (Point2D (x, y)) -> Point2D (x +. deltax, y +. deltay);;
+
+  let scale a b = 
+    fun (Point2D(x, y)) -> Point2D (x *. a, y *. b);;
+
+  let rotate theta = 
+    let costheta = cos theta and sintheta = sin theta in
+    fun (Point2D (x, y)) -> 
+      Point2D (x *. costheta -. y *. sintheta, 
+               y *. costheta +. x *. sintheta);;
+
+  let ( % ) f g x = f (g x);; 
+
+  let set_translate (Set s) deltax deltay = 
+    Set (s % (translate (-.deltax) (-.deltay)));;
+
+  let set_scale (Set s) a b = 
+    Set (s % (scale (1. /. a) (1. /. b)));;
+
+  let set_rotate (Set s) theta = 
+    Set (s % (rotate (-.theta)));;
+
+  let set_rotate_rel (Set s) theta (Point2D (cen_x, cen_y)) = 
+    Set (s % (translate (cen_x) (cen_y)) % 
+               (rotate theta) %  
+               (translate (-.cen_x) (-.cen_y)));;
+
+  let disk1 = disk (Point2D (100., 40.)) 30.;;
+  draw disk1;;
+  draw (set_translate disk1 60. 40.);;
+  draw (set_scale disk1 0.8 1.5);;
+  draw (set_rotate disk1 (3.1415927 /. 4.));;
+
+  let rot s i = 
+    set_rotate_rel s ((3.1415927 /. 2.) *. (float i)) 
+    (Point2D (100., 100.));;
+
+  draw (disk1 +| (rot disk1 1) +| (rot disk1 2) +| (rot disk1 3));;
+
+  let wheel domain (Point2D (cen_x, cen_y) as p) n =
+    let theta = 2. *. 3.1415927 /. (float n) in
+    let rec all_rot i =
+      if i >= n then [] else
+      (set_rotate_rel domain (theta *. (float i)) p) :: (all_rot (i+1))
+    in
+    List.fold_left ( +-| ) set_all (all_rot 0);;
+
+  let ell1 = set_scale disk1 0.8 1.5;;  
+  draw (wheel ell1 (Point2D (100., 100.)) 12);;
+
+
+
+  type real_value = Real of (int -> Num.num);;
+
+  open Num;;
+  let e = Real ( 
+    fun n_decim -> 
+      let err = (Int 1) // ((Int 10) **/ (Int n_decim)) in
+       let rec aux e estim_err m fact = 
+        if estim_err </ err then e else
+        aux (e +/ ((Int 1) // fact))                (* e *)
+            (estim_err */ ((Int 1) // m))   (* estim_err *)
+            (m +/ (Int 1))                          (* m *)
+            (fact */ m)                          (* fact *)
+      in
+      aux (Int 0) (Int 3) (Int 1) (Int 1) );;
+
+  let real_get n_decim (Real x) = x n_decim;;
+
+
+
+  type 'a frozen = Frozen of (unit -> 'a);;
+  let thaw (Frozen x) = x ();;
+
+  let approxim_benchmark froz_exp n = 
+    let t = Unix.gettimeofday () in
+    for i = 1 to n do (thaw froz_exp) done;
+    Unix.gettimeofday () -. t;;
+
+
+  type 'a lazyaux = 
+    | Immediate of 'a
+    | Frozen of (unit -> 'a)
+  and 'a lazyval = LazyVal of 'a lazyaux ref;;
+
+  let thaw (LazyVal e) = match (!e) with
+  | Immediate x -> x
+  | Frozen f -> let u = f () in         
+                e := Immediate u; u;;
+
+  let rec remove x l = match l with
+  | [] -> []
+  | y :: ys -> if x = y then ys 
+               else y :: (remove x ys);;
+
+  let rec insert x l = match l with
+  | [] -> [x]
+  | y :: ys -> if x = y then l else
+               if x < y then x :: l
+               else y :: (insert x ys);;
+
+  type 'a froz_list = { 
+     mutable list: 'a list; 
+     mutable froz_oper:  ('a list -> 'a list) lazy_t list };;
+
+  let froz_empty = { list = []; froz_oper = [] };;
+
+  let froz_insert x l = 
+    l.froz_oper <- (lazy (insert x)) :: l.froz_oper; l;;
+
+  let froz_remove x l = 
+    l.froz_oper <- (lazy (remove x)) :: l.froz_oper; l;;
+
+  let froz_hd l = 
+    l.list <- List.fold_right Lazy.force l.froz_oper l.list; 
+    l.froz_oper <- []; 
+    List.hd l.list;;
+
+
+
+  type 'a frozen_flow =  
+    | End of 'a 
+    | Step of 'a frozen_flow lazy_t;;
+
+  let fact n = 
+    let rec aux m acc = 
+      if m <= 1 then End acc  
+                else Step (lazy (aux (m - 1) (m * acc)))
+    in aux n 1;;
+
+
+  type ('a, 'data) ext_frozen_flow =  
+    | End of 'a 
+    | Step of ('data * ('a, 'data) ext_frozen_flow) lazy_t;;
+
+  let fact n = 
+    let rec aux m acc = 
+      if m <= 1 then End acc  
+                else Step (lazy ((m, acc), aux (m - 1) (m * acc)))
+    in aux n 1;;
+
+
+
+  let (!!) x = Lazy.force x;;
+
+
+
+  type 'a stm =  
+    | StmEmpty
+    | Cons of 'a lazy_t * 'a stm lazy_t;;
+
+  let stm_hd s = match s with
+  | Cons (x, _) -> (!!)x
+  |  _ -> failwith "stm_hd";;
+
+  let stm_tl s = match s with
+  | Cons (_, xs) -> (!!)xs
+  |  _ -> failwith "stm_tl";;
+
+  let rec stm_nth s n = match s with
+  | StmEmpty -> failwith "Empty stream"
+  | Cons (x, xs) -> 
+      if n = 0 then (!!)x 
+               else stm_nth ((!!)xs) (n - 1);;
+
+  let rec stm_npeek n s = match s with
+  | StmEmpty -> []
+  | Cons (x, xs) -> 
+      if n <= 0 then [] 
+      else ((!!)x) :: stm_npeek (n - 1) ((!!)xs);;
+
+  let rec list_build f n x = 
+    if n <= 0 then [] 
+    else x :: (list_build f (n - 1) (f x));;
+
+  let rec stm_build_bounded f x n = 
+    if n <= 0 then StmEmpty 
+    else Cons (lazy x, lazy (stm_build_bounded f (f x) (n - 1)));;
+
+  let rec stm_build f x =
+    Cons (lazy x, lazy (stm_build f (f x)));;
+
+  let rec stm_map f s = match s with
+  | StmEmpty -> StmEmpty
+  | Cons (x, xs) -> Cons (lazy (f ((!!)x)), 
+                          lazy (stm_map f ((!!)xs)));;
+
+  let rec stm_compose f s1 s2 = match (s1, s2) with
+  | _, StmEmpty -> StmEmpty 
+  | StmEmpty, _ -> StmEmpty
+  | Cons (x, xs), Cons (y, ys)  -> 
+       Cons (lazy (f ((!!)x) ((!!)y)), 
+             lazy (stm_compose f ((!!)xs) ((!!)ys)));;
+
+  let rec stm_mem s x = match s with 
+  | StmEmpty -> false
+  | Cons (y, ys) -> (x = (!!)y) || stm_mem ((!!)ys) x;;
+
+  let rec stm_filter p s = match s with 
+  | StmEmpty -> StmEmpty
+  | Cons (x, xs) -> 
+      if p ((!!)x) then Cons (x, lazy (stm_filter p ((!!)xs)))
+                    else stm_filter p ((!!)xs);; 
+
+  let rec stm_equal s s' = match (s, s') with
+  | StmEmpty, StmEmpty         -> true
+  | Cons (x, xs), Cons (x', xs') -> 
+      (!!)x = (!!)x' && (stm_equal ((!!)xs) ((!!)xs'))
+  | _ -> false;;
+
+  let rec stm_fold_left f e s = match s with 
+    | StmEmpty -> e
+    | Cons (x, xs) -> stm_fold_left f (f e ((!!)x)) ((!!)xs);;
+
+  let stm_length s = stm_fold_left (fun x y -> x + 1) 0 s;;
+
+  let stm_max s = stm_fold_left max (stm_hd s) s;;
+
+  let rec stm_append s1 s2 = match s1 with
+  | StmEmpty -> s2
+  | Cons (x, xs) -> Cons (x, lazy (stm_append ((!!)xs) s2));;
+
+  let rec stm_mem_val s x = match s with 
+  | StmEmpty -> false
+  | Cons (y, ys) -> 
+      Lazy.lazy_is_val y && (x = (!!)y || stm_mem ((!!)ys) x);;
+
+  let rec stm_of_list l =
+    List.fold_right (fun x y -> Cons (lazy x, lazy y)) l StmEmpty;;
+
+  let rec stm_of_lazylist l =
+    List.fold_right (fun x y -> Cons (x, lazy y)) l StmEmpty;;
+
+
+  let random_binary_sequence len = 
+    Random.self_init (); 
+    list_build (fun x -> (Random.int 2)) len (Random.int 2);;
+
+  let random_binary_stm () =
+    Random.self_init (); 
+    stm_build (fun x -> (Random.int 2)) (Random.int 2);;
+
+
+  type 'a bintree = 
+    | BinEmpty
+    | BinNode of 'a * 'a bintree * 'a bintree;; 
+
+  let stm_of_bintree t = 
+    let rec aux t acc = match t with
+    | BinEmpty -> acc
+    | BinNode (y, t1, t2) -> Cons (lazy y, lazy (aux t1 (aux t2 acc)))
+    in
+    aux t StmEmpty;;
+
+  let stm_of_struct nexts s start = 
+    let rec aux to_visit visited = match to_visit with
+    | [] -> StmEmpty
+    | k :: ks -> 
+       if List.mem k visited then aux ks visited 
+       else Cons (lazy k, lazy (aux (ks @ (nexts s k)) (k :: visited)))
+    in 
+    aux [start] [];;
+
+  let stm_of_graph g nexts key_start = 
+    stm_of_struct nexts g key_start;;
+
+
+  type 'a rstm = RStm of 'a stm ref;;
+
+  let rstm_next (RStm s) = match !s with
+  | StmEmpty -> failwith "Empty stream"
+  | Cons (x, xs) -> s := (!!)xs; (!!)x;;
+
+  let stm_gen nexts start = 
+    let rec aux to_visit visited = match to_visit with
+    | [] -> StmEmpty
+    | k :: ks -> 
+        if List.mem k visited then aux ks visited 
+        else Cons (lazy k, lazy (aux (ks @ (nexts k)) (k :: visited)))
+    in 
+    aux [start] [];;
+
+  let stm_of_graph_paths g nexts key_start = 
+    stm_gen
+      (fun s -> List.map (fun x -> x :: s) 
+                  (nexts g (List.hd s))) 
+      [key_start];;
+
+
+
+  type 'a lazybintree = 
+    | LBinEmpty
+    | LBinNode of ('a lazy_t) * 'a lazybintree lazy_t 
+                              * 'a lazybintree lazy_t;; 
+
+  type 'a lazytree =
+    | LTreeEmpty
+    | LTreeNode of  ('a lazy_t) * 'a lazytree stm;;
+
+  let rec lazytree_build f x = 
+    LTreeNode (lazy x, stm_map (lazytree_build f) (f x));;
+
+  let lazytree_interv d = 
+    lazytree_build (fun x -> 
+      stm_build_bounded (fun x -> x + 1) (d * x - d + 2) d) 1;;
+
+  let lazytree_npeek strategy t n = 
+    let rec aux to_visit visited m = 
+      if (m >= n || to_visit = StmEmpty) then List.rev visited 
+      else
+      match stm_hd to_visit with
+      | LTreeEmpty           -> aux (stm_tl to_visit) visited m
+      | LTreeNode (y, y_stm) -> aux (strategy (stm_tl to_visit) y_stm)
+                                    ((!!)y :: visited) (m + 1)
+    in
+    aux (Cons (lazy t, lazy StmEmpty)) [] 0;;
+
+  let lazytree_npeek_b t n = 
+    lazytree_npeek stm_append t n;; 
+
+  let lazytree_npeek_d t n = 
+    lazytree_npeek (fun x y -> stm_append y x) t n;; 
+
+  let lazytree_npeek_rand quantif t n = 
+    lazytree_npeek 
+      (fun x y -> if Random.int quantif = 0 
+                    then stm_append y x
+                    else stm_append x y) t n;; 
+
+  let rec lazytree_map f t = match t with 
+  | LTreeEmpty -> LTreeEmpty
+  | LTreeNode (x, t_stm) ->
+      LTreeNode (lazy (f ((!!)x)), stm_map (lazytree_map f) t_stm);;
+
+
+
+  type graphic_square = { left_x: int; left_y: int; 
+                          size: int; color: color;
+                          draw: unit -> unit }
+
+  let new_graphic_square x y s c = 
+    { left_x = x; left_y = y; 
+      size = s; color = c;
+      draw = fun () -> set_color (rgb c c c); fill_rect x y s s;
+                       set_color black; draw_rect x y s s; };;
+
+  let square_nexts {left_x = x; left_y = y; size = s; color = c} = 
+    let ns = s / 2 in 
+    let nc = int_of_float ((float c) *. 0.8) in
+    Cons (lazy (new_graphic_square x y ns nc), lazy (Cons (
+          lazy (new_graphic_square (x + ns) y ns nc), lazy (Cons (
+          lazy (new_graphic_square x (y + ns) ns nc), lazy (Cons (
+          lazy (new_graphic_square (x + ns) (y + ns) ns nc), 
+          lazy StmEmpty)))))));;
+
+  let square_inside s (x, y) = 
+    (x >= s.left_x) && (x < s.left_x + s.size) &&
+    (y >= s.left_y) && (y < s.left_y + s.size);;
+
+  let rec square_look t (a, b) = match t with 
+  | LTreeEmpty -> raise Not_found
+  | LTreeNode (x, t_stm) -> 
+      let Cons (first, _) = t_stm in 
+      if Lazy.lazy_is_val first 
+      then List.iter (fun (LTreeNode (y, _) as t) -> 
+                        if square_inside ((!!)y) (a, b) then 
+                           square_look t (a, b)) 
+                     (stm_npeek 4 t_stm)
+      else List.iter (fun (LTreeNode (y, _)) -> ((!!)y).draw ()) 
+                     (stm_npeek 4 t_stm);;
+
+  let interaction_with_lazytree t = 
+    while true do
+      let s = wait_next_event [Button_down] in
+      if s.button then square_look t (s.mouse_x, s.mouse_y)
+    done;;
+
+
+
+
+ let sqrt_cont kfail ksuccess x = 
+    if x < 0. then kfail x 
+              else ksuccess (sqrt x);;
+
+  sqrt_cont (fun x -> None)
+            (fun x -> Some x) 
+            (-1.);; 
+
+  sqrt_cont (fun x -> failwith "Negative") 
+            (fun x -> x) 
+            (-1.);; 
+
+  type complex = C of float * float;;
+  sqrt_cont (fun x -> C (0., sqrt(-.x)))  
+            (fun x -> C (x, 0.)) 
+            (-1.);;
+
+  let sqrt_option =  
+    sqrt_cont (fun x -> None) (fun x -> Some x);;
+  let sqrt_excep =  
+    sqrt_cont (fun x -> failwith "Negative") (fun x -> x);;
+  let sqrt_complex = 
+    sqrt_cont (fun x -> C (0., sqrt (-.x))) 
+              (fun x -> C (x, 0.)) ;;
+
+  let rec prod l = match l with 
+  | [] -> 1
+  | x :: xs  -> if x = 0 then 0 else x * (prod xs);;
+ 
+  let prod l = 
+    let rec aux l kont = match l with 
+    | [] -> kont 1
+    | x :: xs  -> if x = 0 then 0 
+                  else aux xs (fun y -> kont (x * y))
+    in
+    aux l (fun x -> x) ;;
+
+  let insert el li = 
+    let rec aux l kont = match l with
+    | [] -> kont [el]
+    | x :: xs -> if el = x then li else 
+                 if el <  x then kont (el :: l) 
+                            else aux xs (fun y -> kont (x :: y))
+    in 
+    aux li (fun x -> x);;
+
+
+
+  type color = R | B;;
+  type 'a rb_tree = 
+    | Empty 
+    | RBNode of color  * 'a * 'a rb_tree * 'a rb_tree;;
+
+  let local_balance node_data = match node_data with 
+  | B, x, t1, RBNode (R, y, t2, RBNode (R, z, t3, t4)) 
+  | B, z, RBNode (R, y, RBNode (R, x, t1, t2), t3), t4 
+  | B, x, t1, RBNode (R, z, RBNode (R, y, t2, t3), t4) 
+  | B, z, RBNode (R, x, t1, RBNode (R, y, t2, t3)), t4 
+    -> RBNode (R, y, RBNode (B, x, t1, t2), RBNode (B, z, t3, t4))
+  | c, x, t1, t2   -> RBNode (c, x, t1, t2);;  
+
+  (* Okasaki version with evaluation control based on continuations : *)
+  let rb_tree_insert tree x = 
+    let rec aux t kont = match t with 
+      | Empty -> kont (RBNode (R, x, Empty, Empty))
+      | RBNode (color, y, t1, t2) -> 
+         if x = y then tree else             
+         if x < y then 
+           aux t1 (fun t -> kont (local_balance (color, y, t, t2)))
+         else 
+           aux t2 (fun t -> kont (local_balance (color, y, t1, t)))
+    in
+    let RBNode (_, x, t1, t2) = aux tree (fun x -> x) in    
+    RBNode (B, x, t1, t2);;          
+
+
+
+  type 'a tree2_3 = 
+    | Empty
+    | Leaf of 'a 
+    | Node2 of 'a * 'a tree2_3 * 'a tree2_3
+    | Node3 of 'a * 'a tree2_3 * 'a tree2_3 * 'a tree2_3;;
+
+  let data t = match t with 
+  | Empty -> failwith "Empty tree"
+  | Leaf x -> x
+  | Node2 (x, _, _) -> x
+  | Node3 (x, _, _, _) -> x;;   
+
+  let tree2_3_insert tree new_el =
+    let rec aux t new_el replace join = match t with
+    | Empty   -> replace (Leaf new_el)                      (*1(a)*)
+    | Leaf el -> 
+       if el = new_el then tree else         
+       if el < new_el then join (Leaf el) (Leaf new_el)     (*1(b)*)
+                      else join (Leaf new_el) (Leaf el)     (*1(b)*)
+    | Node2 (max, t1, t2)  -> if new_el <= data t1 then 
+      aux t1 new_el 
+        (fun t    -> replace (Node2 (max, t, t2)))          (*1(c)i*) 
+        (fun t t' -> replace (Node3 (max, t, t', t2))) else(*1(c)ii*) 
+      aux t2 new_el
+        (fun t    -> replace (Node2 (data t, t1, t)))        (*1(c)i*) 
+        (fun t t' -> replace (Node3 (data t', t1, t, t')))  (*1(c)ii*) 
+    | Node3 (max, t1, t2, t3) -> 
+      let localjoin = 
+        fun t t' z w -> join (Node2 (data t', t, t'))
+                             (Node2 (data w, z, w)) in
+      if new_el <= data t1 then 
+      aux t1 new_el
+        (fun t    -> replace (Node3 (max, t, t2, t3)))      (*1(d)i*)  
+        (fun t t' -> localjoin t t' t2 t3) else            (*1(d)ii*)  
+      if new_el <= data t2 then 
+      aux t2 new_el
+        (fun t    -> replace (Node3 (max, t1, t, t3)))      (*1(d)i*)
+        (fun t t' -> localjoin t1 t t' t3) else            (*1(d)ii*) 
+      aux t3 new_el
+        (fun t    -> replace (Node3 (data t, t1, t2, t)))    (*1(d)i*)
+        (fun t t' -> localjoin t1 t2 t t')                 (*1(d)ii*)
+    in
+    aux tree new_el (fun t -> t)
+                    (fun t t' -> Node2 (data t', t, t'));;  
+
+

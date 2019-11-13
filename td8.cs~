@@ -1,0 +1,37 @@
+(********* Exercice  3  *********)
+
+static IEnumerable<int> GetPrimes() {
+  var index = 2;
+  while (true) {
+    if (IsPrime(index))
+      yield return index;
+    index++;
+  }}
+
+ 
+using System;
+using System.Linq;
+using System.Collections.Generic;
+
+class Program {
+    public class Thread {
+        public int Workload {get; set;}
+        public int Pid      {get; private set;}
+        private IEnumerator<int> Worker;  // An enumerator of the tasks
+                                          // of the thread (represented by ints)
+        static Random rng = new Random(); // Number generator in the class
+        public Thread() {
+            Workload = 0;
+            Pid      = rng.Next() % 100 + 100;  // Random pid number
+            Worker   = this.CreateWorker().GetEnumerator();
+        }
+        public int Work() {
+            int load = Worker.Current;
+            Workload += load;
+            Worker.MoveNext();
+            return load;
+        }}
+
+    public static void Main() { Console.WriteLine("Yield !"); }
+}
+ 

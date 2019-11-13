@@ -1,0 +1,50 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+  <head>
+    <meta http-equiv="content-type" content="text/html;charset=UTF-8" />
+    <style media="screen" type="text/css">
+      .error { color:red; font-size: 75%; }
+    </style>
+    <script type="text/javascript" src="http://www.labri.fr/perso/renault/working/teaching/tap/files/jquery-3.2.1.js"></script>
+    <script type="text/javascript" src="tap-custom.js"></script>
+  </head>
+  <body>
+    <div>
+      <form>
+	<table>
+	  <tr>
+	    <td>First name:</td>
+	    <td><input type="text" id="first_name" name="firstname"></td>
+	    <td id="first_name_error" class="error"></td>
+	  </tr>
+	  <tr>
+	    <td>Last name:</td>
+	    <td><input type="text" id="last_name" name="lastname"></td>
+	    <td id="last_name_error" class="error"></td>
+	  </tr>
+	  <tr>
+	    <td>Email address:</td>
+	    <td><input type="text" id="email" name="email"></td>
+	    <td id="email_error" class="error"></td>
+	  </tr>
+	  <tr>
+	    <td>Webpage:</td>
+	    <td><input type="text" id="webaddr" name="webaddr"></td>
+	    <td id="webaddr_error" class="error"></td>
+	  </tr>
+	</table>
+      </form>
+    </div>
+    <div>
+      <button onClick="clear_fields()">Clear fields</button>
+      <button onClick="init_fields()">Init fields</button>
+    </div>
+    <div>
+      <button onClick="check_form_imp()">Submit imperative</button>
+      Result : <span id="result_imp"/>
+    </div>
+    <div>
+      <button onClick="check_form_promise_opt()">Submit promise</button>
+      Result : <span id="result_promise"/>
+    </div>
+  </body>
+</html>

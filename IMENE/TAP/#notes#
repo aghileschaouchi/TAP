@@ -1,0 +1,44 @@
+pour démarrer ocaml: ouvrir emacs -> ctrl+x ctrl+f -> taper nom_fichier.ml -> ctrl+x ctrl+e 
+
+partie haut: code ML
+partie bas: boucle d'interaction
+
+ctrl+x ctrl+e : demarrer le lanceur 
+ctrl+c ctrl+k : arreter le processus
+
+let x=1;;           ===     var x=1;
+(liaison, binding)          (variable)
+
+
+exo3:
+dans la boucle d'iteration: tester des operations du genre
+10*2;; etc
+
+en mode float : 10.5 *. 5.8;; 
+
+==> se referer a la doc dans le lien de l'exo3
+
+int * int → int (pr voir tous les types : "( operateur );;" exple ( * );;
+
+3.i) let x= true;;
+3.ii) let x=sqrt;;
+3.iii) let f= fun x -> x+1;; ( fonction anonyme)
+       let f x = x+1;; (pas anonyme)
+
+exercice 4:
+make_even: prend une fonction et renvoie une FONCTION 
+
+
+2. termes: generalisation / specialisation
+specialisation on en a parlé avec le epsilon qu'on a passé en parametre
+
+exerice 5:
+
+fct approx_pi en ocaml: ca genere un stack overflow à une certaine val (~250000)
+par contre,
+fct approx_pi en c: en compilant avec -O2, ce qui optimise les appels récursifs en c, ça fait tres bien tous les calculs
+why? => récurstion terminale
+
+********** A RENDRE ***************
+fichier ml (sans archive) avec les 2 noms
+lundi soir !  

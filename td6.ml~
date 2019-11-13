@@ -1,0 +1,20 @@
+(* Exercice 1 *) 
+type 'k key         = K of 'k
+and ('k, 'a) vertex = 'k key * 'a
+and ('k, 'a) graph  =
+  Graph of (('k, 'a) vertex * 'k key list) list;;
+ 
+Graph ([
+         ((K 1, "A"), [K 2; K 3]);
+         ((K 2, "B"), [K 4; K 5]);
+         ((K 3, "C"), [K 6; K 7]);
+         ((K 4, "A"), []);
+         ((K 5, "C"), []);
+         ((K 6, "D"), []);
+         ((K 7, "C"), []);
+      ])
+
+      (* 1.1 *)
+let rec next g =
+  match g with
+  | 

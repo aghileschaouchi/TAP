@@ -1,0 +1,144 @@
+type value = 
+  | Int of int 
+  | Float of float;;
+
+(*test: Int 3;; => value*)
+  
+let string_of_value x =
+  match x with  (*= il y a deux possibilités: soit x est int soit x est float*)
+  | Int i   -> string_of_int i;
+  | Float f -> string_of_float f;;
+
+(* exercice 1 *)
+(* 1.1 *)
+type weight =
+  | Kilo of float
+  | Livre of float
+  | Carat of float;;
+
+(* 1.2 *)
+(*Le pattern matching n'est pas exhaustif. Il est nécessaire de préciser tous les cas possibles (dans notre cas, on doit gérer le kilo. *)
+let rec compare_weight x =
+  match x with
+  | Kilo i -> i;
+  | Livre i -> i /. 2.205 ; 
+  | Carat i -> i /. 5000. ;;
+
+(* test *)
+let lv = Livre(12.4);;
+  compare_weight (lv);;
+
+(* 1.3 *)
+(*match sur une paire de valeurs. il manquait le cas (float, int)
+ on a une grammaire et du code qui utilise cette grammaire. Le système vérifie que tous les cas sont traités.
+*)
+let rec sum_of_values a b = match (a,b) with 
+  | (Int i,Int j)     -> Int(i+j)
+  | (Int i,Float f)   -> Float((float i)+.f)
+  | (Float f,Int i)   -> Float((float i)+.f)
+  | (Float f,Float g) -> Float (f+.g);;
+  
+(* 1.4 *)
+(*
+Ce qu'on essaye d'éviter c'est d'avoir plusieurs représentations possibles sur un meme objet si on spécifie que c'est un int.
+cette manière représente les objets de manière unique (sous forme de porte-monnaie), donc la comparaison, par exemple, est simplifiée (compter le nombre de pièces de 13, le nombre de pièces de 7 et le nombre de pièces de 1).
+ *)
+type coin =
+  |One 
+  |Seven
+  |Thirteen;; 
+
+let rec glouton n =
+  match n with
+  | k when k>=13 -> Thirteen::glouton(k-13);
+  | k when k>=7  -> Seven::glouton(k-7);
+  | k when k>=1  -> One::glouton(k-1);
+  | _ -> [];;
+       
+  glouton 21;;
+
+(********* Exercice  2  *********)
+  (*un arbre est soit un arbre vide, soit un noeud avec un fils droite et un fils gauche*)
+type 'a bintree = 
+| BinEmpty
+| BinNode of 'a * 'a bintree * 'a bintree 
+
+let rec bintree_build f h x = 
+  if (h <= 0)
+  then BinEmpty
+  else let (x1,x2) = f(x) in 
+          BinNode (x,
+            (bintree_build f (h-1) x1),
+            (bintree_build f (h-1) x2));;
+
+(* 2.1 *)
+let f x = (2*x , 2*x+1);;
+
+(*pour bintree, h est la taille de l'arbre, et x est la valeur de départ. *)
+
+let treebin =  bintree_build f 3 1;;
+
+(* 2.2 *)
+(*le map prend un arbre et renvoie un arbre sur lequel on applique une fonction donnée. On utilise le pattern matching pour traiter les cas où:
+ - l'arbre est vide. Dans ce cas on renvoie un arbre vide.
+ - l'arbre est non vide. Dans ce cas on a un triplet: le noeud, le fils gauche et le fils droit; on construit un nouvel arbre avec de nouveaux binNode en transformant les valeurs à l'intérieur du noeud en appliquant f.  *)
+    
+let rec bintree_map f tree =
+  match tree with
+  | BinEmpty -> BinEmpty;
+  | BinNode  (t,tl,tr) -> BinNode(f t, bintree_map f tl, bintree_map f tr );;
+
+ 
+(* 2.3 *)
+let rec bintree_insert tree n =
+  match tree with
+  |BinEmpty -> BinNode(n, BinEmpty,BinEmpty);
+  |BinNode(k,tl,tr) ->
+    
+    if k<n then
+      BinNode(k,tl,bintree_insert tr n)  (* insertion a droite de l'arbre *)
+    else 
+      BinNode(k,bintree_insert tl n,tr);; (* insertion à gauche de l'arbre *)
+    
+(* 2.4 *)
+(* On peut implémenter la fonction d'insert avec des pointeurs en créant le moins possible de nouveaux objets en mémoire. En effet, la majorité de l'arbre reste inchangée, donc on réutilise des objets pour former le nouvel arbre.
+L'algorithme est le suivant:
+ - Parcourir la structure
+ - Trouver l'endroit approprié
+ - Changer le pointeur vers le nouveau noeud.
+Si on veut conserver les deux arbres (l'ancien et le nouveau), on crée de nouveaux noeuds qui pointent sur l'endroit concerné par l'insertion. On utilise le fait qu'en mémoire, il y a des objets qui persistent même après l'insertion parce que leurs noeuds fils n'ont pas changé.
+ *)
+
+(* 2.5 *)
+(* Pour implémenter la fonction de fold pour les arbres binaires, il faut obligatoirement une fonction qui prend exactement trois paramètres. En effet, pour une fonct *)  
+let rec bintree_fold f a t =
+  match t with
+  | BinEmpty -> a
+  | BinNode (n, tl, tr) -> f n (bintree_fold f a tl) (bintree_fold f a tr);;
+
+(* Nous testons en faisant la somme des noeuds de l'arbre treebin créé précédemment en 2.1 *)  
+let sum x y z= x + y + z;;
+bintree_fold sum 0 treebin;;
+    
+(* 2.6 bonus *)
+type 'a tree =
+  | TreeEmpty
+  | TreeNode of 'a * (('a tree) list)
+
+let rec list_map f list =
+  match list with
+  |[] -> []
+  |hd::tl ->
+    begin
+      f (List.hd list)::(list_map f (List.tl list))
+    end
+;;
+                       
+(* il faut transformer la liste des fils en nouvelle liste de fils. Avec map.*)
+let rec tree_map f tree =
+  match tree with
+  | TreeEmpty -> TreeEmpty;
+  | TreeNode(t,listSons) -> TreeNode (f t, tree_map(f, list_map f listSons));;
+
+  
+  

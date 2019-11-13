@@ -1,0 +1,231 @@
+(********* Exercice  1  *********)
+ 
+type 'a set = Set of ('a -> bool)
+
+let set_empty = Set (fun x -> false);;
+let set_all = Set (fun x -> true);;
+let singleton x = Set (fun y -> x = y);;
+let set_mem (Set s) x = s x;;
+let set_add (Set s) x = Set (fun y -> s y || y = x);;
+let set_del (Set s) x = Set (fun y -> y != x && s y);;
+
+(* Elementary operators *)
+let out (Set s) = Set (fun y -> not (s y));;
+let ( +| ) (Set s1) (Set s2) = Set (fun y -> s1 y || s2 y);;  
+let ( *| ) (Set s1) (Set s2) = Set (fun y -> s1 y && s2 y);; 
+
+(* Symmetric difference - Two manners *)
+let ( +-| ) s1 s2 = (s1 *| (out s2)) +| ((out s1) *| s2);;
+
+let xor x y = not (x=y);;
+
+let ( +-||) (Set s1) (Set s2) = Set (fun y -> xor (s1 y) (s2 y));;
+ 
+(********* Exercice  2  *********)
+ 
+type point2D = Point2D of float * float;;
+
+let set_draw_wh width height s =
+  let im = Array.make_matrix height width Graphics.black in 
+    for j = 0 to height - 1 do
+      for i = 0 to width - 1 do
+        if set_mem s (Point2D (float i, float j)) then 
+          im.(height - 1 - j).(i) <- Graphics.white
+      done
+    done;
+    Graphics.draw_image (Graphics.make_image im) 0 0;;
+
+let set_draw = set_draw_wh 200 200;;
+Graphics.open_graph " 200x200";;
+
+let dist_euclid (x, y) (w, z) = 
+  sqrt ((x -. w) ** 2. +. (y -. z) ** 2.);;
+
+let disk (Point2D (cen_x, cen_y)) radius =
+  Set (fun (Point2D (x, y)) ->
+         dist_euclid  (cen_x, cen_y) (x, y) <= radius);;
+
+let disk1 = disk (Point2D (50.,50.)) 45.;;
+
+let translate deltax deltay = 
+  fun (Point2D (x, y)) -> Point2D (x +. deltax, y +. deltay);;
+let scale a b = 
+  fun (Point2D(x, y)) -> Point2D (x *. a, y *. b);;
+let rotate theta = 
+  let costheta = cos theta and sintheta = sin theta in
+    fun (Point2D (x, y)) -> 
+      Point2D (x *. costheta -. y *. sintheta, 
+               y *. costheta +. x *. sintheta);;
+
+let ( % ) f g x = f (g x);;   (* generic composition *)
+
+let set_translate (Set s) deltax deltay = 
+  Set (s % (translate (-.deltax) (-.deltay)));;
+let set_scale (Set s) a b = 
+  Set (s % (scale (1. /. a) (1. /. b)));;
+let set_rotate (Set s) theta = 
+  Set (s % (rotate (-.theta)));;
+let set_rotate_rel (Set s) theta (Point2D (cen_x, cen_y)) = 
+  Set (s % (translate (cen_x) (cen_y)) % 
+         (rotate theta) %  
+         (translate (-.cen_x) (-.cen_y)));;
+
+let rot s i = 
+  set_rotate_rel s ((3.1415927 /. 2.) *. (float i)) 
+    (Point2D (100., 100.));;
+
+set_draw (disk1 +| (rot disk1 1) +| (rot disk1 2) +| (rot disk1 3));;
+
+let wheel domain (Point2D (cen_x, cen_y) as p) n =
+  let theta = 2. *. 3.1415927 /. (float n) in
+  let rec all_rot i =
+    if i >= n then [] else
+      (set_rotate_rel domain (theta *. (float i)) p) :: (all_rot (i+1))
+  in
+    List.fold_left ( +-|| ) set_all (all_rot 0);;
+
+let ell1 = set_scale disk1 0.8 1.5;;  
+set_draw ell1;;
+set_draw (wheel ell1 (Point2D (100., 100.)) 6);;
+set_draw (wheel ell1 (Point2D (100., 100.)) 24);;
+ 
+(********* Exercice  3  *********)
+ 
+(* First implementation freezing values *)
+type 'a frozen_flow = 
+| End of 'a
+| Step of (unit -> 'a frozen_flow);;
+
+let thaw t = match t with 
+  | End x  -> End x
+  | Step f -> f();;
+
+let ppcm x y =
+  let rec ppcm_rec x y mul = 
+    if (y > x) then (ppcm_rec y x mul) else (* Ensures x >= y *)
+    if (x = 0) then 0 else (* Ensures both are positive *)
+      let r = (x mod y) in 
+        if (r = 0) then (mul/y) else ppcm_rec y r mul
+  in ppcm_rec x y (x*y);;
+
+let ppcm_lazy x y =
+  let rec ppcm_lazy_rec x y mul = 
+    if (y > x) then 
+      Step (fun () -> (ppcm_lazy_rec y x mul)) else
+    if (y = 0) then End 0 else
+      let r = (x mod y) in 
+        if (r = 0) then End (mul/y) else 
+          Step (fun () -> (ppcm_lazy_rec y r mul))
+  in ppcm_lazy_rec x y (x*y);;
+
+ppcm_lazy 12 14;;
+thaw(thaw(ppcm_lazy 12 14));;
+
+(* Second implementation displaying the values taken during the computation *)
+type ('key,'data) frozen_data_flow = 
+| End of 'data
+| Step of (unit -> (('key*'data) list) * ('key,'data) frozen_data_flow);;
+
+let nthaw t = match t with 
+  | End x  -> ([],End x)
+  | Step f -> f();;
+
+let nppcm x y =
+  let rec nppcm_rec x y mul = 
+    if (y > x) then 
+      Step (fun () -> ([("x",y);("y",x)],nppcm_rec y x mul)) else
+    if (y = 0) then End 0 else
+      let r = (x mod y) in 
+        if (r = 0) then End (mul/y) else 
+          Step (fun () -> ([("x",y);("y",r)],nppcm_rec y r mul))
+  in nppcm_rec x y (x*y);;
+
+nppcm 12 14;;
+nthaw(snd(nthaw(nppcm 12 14)));;
+ 
+(********* Exercice  4  *********)
+ 
+let lazy_int   = lazy(1);;
+let lazy_list  = lazy([5;6;7]);;
+let lazy_array = lazy(Array.make 5 "Cot");;
+Lazy.force lazy_array;;
+Lazy.force lazy_array;;
+(* Notice that the type of lazy_array is not modified *)
+lazy_array;;
+
+let lazy_print = lazy(print_string "Codec");;
+Lazy.force lazy_print;; (* The print is done only once *)
+Lazy.force lazy_print;; (* The result of the evaluation is unit *)
+
+let f = lazy (failwith "Marchera pas");;
+Lazy.force f;; (* The exception is thrown each time *)
+Lazy.force f;; (* It can be thought as the result of the evaluation *)
+  
+  
+ 
+(********* Exercice  5  *********)
+ 
+type 'a stm =
+| StmEmpty
+| StmCons of ('a * 'a stm) lazy_t
+
+let my_stm = StmCons (lazy (1, StmCons(lazy (1/0, StmEmpty))));;
+(* Problem : the first element must be evaluated *)
+
+let stm_head stm = match stm with
+  | StmEmpty           -> failwith "No head"
+  | StmCons(lazy(x,_)) -> x;;
+let stm_tail stm = match stm with
+  | StmEmpty           -> failwith "No tail"
+  | StmCons(lazy(_,t)) -> t;;
+
+stm_head my_stm;;
+stm_tail my_stm;;
+
+let rec length_evaluated stm = match stm with
+  | StmEmpty   -> 0
+  | StmCons(t) -> if not(Lazy.is_val t)
+		    then 0
+		    else let (_,u) = Lazy.force t in
+			 1 + length_evaluated u;;
+
+length_evaluated my_stm;; (* -> 0 *)
+stm_head my_stm;;         (* -> 1, the head of the stream *)
+length_evaluated my_stm;; (* -> 1 *)
+ 
+let rec stm_npeek stm n = if (n<=0) then [] else match stm with
+  | StmEmpty            -> []
+  | StmCons(lazy(u,v))  -> u::(stm_npeek v (n-1));;
+
+let rec list_to_stream l = match l with
+  | []   -> StmEmpty
+  | x::c -> StmCons (lazy(x, list_to_stream c));;
+
+list_to_stream [1;2;3;4];;
+stm_npeek (list_to_stream [1;2;3;4]) 72;;
+
+let rec fun_to_stream_bounded f x n =
+  if (n=0) then StmEmpty
+  else StmCons (lazy (x, fun_to_stream_bounded f (f x) (n-1)));;
+
+let rec fun_to_stream f x =
+  StmCons (lazy (x, fun_to_stream f (f x)));;
+
+stm_npeek (fun_to_stream_bounded (fun x -> x + 1) 1 10) 72;;
+stm_npeek (fun_to_stream (fun x -> x + 1) 1) 72;;
+
+let rec stm_map f stm = match stm with
+  | StmEmpty           -> StmEmpty
+  | StmCons(lazy(u,v)) -> StmCons(lazy(f u, stm_map f v));;
+
+let rec stm_compose f stm1 stm2 = match (stm1,stm2) with
+  | (StmEmpty,StmEmpty)                         -> StmEmpty
+  | (StmCons(lazy(u1,v1)),StmCons(lazy(u2,v2))) -> StmCons(lazy(
+                                      ((f u1 u2),(stm_compose f v1 v2))))
+  | _ -> failwith "stm_compose : different lengths";;
+
+let rec stm_concat stm1 stm2 = match stm1 with
+  | StmEmpty           -> stm2
+  | StmCons(lazy(u,v)) -> StmCons(lazy(u, stm_concat v stm2));;
+ 
+

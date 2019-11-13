@@ -1,0 +1,108 @@
+(********* Exercice  1  *********)
+ 
+let f = lazy (failwith "Marchera pas");;
+Lazy.force f;;
+
+(*** 1.1 ***)
+let lazy_int = lazy(1);;
+let lazy_list = lazy ([1,2,3]);;
+let x = lazy(1/0);;
+let lazy_print = lazy(print_string("ABC"));;
+  
+  Lazy.force  x;;
+  Lazy.force lazy_print;; (*affiche "ABC" mais pas au deuxieme appel.*)
+  Lazy.force lazy_print;;
+(*** 1.2 ***)
+(*** 1.3 ***)
+
+  
+(********* Exercice  2  *********)
+ 
+type 'a stm =
+| StmEmpty
+| StmCons of ('a * 'a stm) lazy_t
+ 
+let rec length_evaluated stm = match stm with
+  | StmEmpty   -> 0
+  | StmCons(x) -> if not(Lazy.is_val x)
+                    then 0
+                    else let (_,v) = Lazy.force x in
+                         1 + length_evaluated v;;
+
+
+let int_stm = StmCons(lazy((1),
+                  StmCons(lazy((1/0),
+                     StmEmpty))));;
+
+(*** 2.2 ***)
+
+let stm_head st =
+  match st with
+  | StmEmpty -> failwith("No head")
+  | StmCons(lazy (u,_))-> u;; (*originally stmcons(lazy u,_) = Lazy.force x in u ;;*)
+
+let stm_tail st =
+  match st with
+  | StmEmpty -> failwith("No tail")
+  | StmCons(lazy (_,u)) -> u;;
+
+stm_head (stm_tail int_stm);;
+  
+(*** 2.3 ***)
+let rec list_to_stream l =
+  match l with
+  |[] -> StmEmpty
+  |(x::xs) -> StmCons(lazy(x,list_to_stream xs));;
+
+let rec stm_peek n s = (*tester des flots qui sont grands *)
+  if(n=0) then [] else
+   match s with
+   | StmEmpty -> []
+   | StmCons(lazy(u,v)) -> u::(stm_peek (n-1) v);; 
+
+
+let l = [1;2;3];;
+let st_list = list_to_stream l;;
+stm_peek 30 st_list;;
+    
+(*** 2.4 ***)
+let rec fun_to_stream_bounded f n =
+  let rec build k = (*construit le flot de k à n *)
+    if(k>n) then StmEmpty
+    else
+      StmCons(lazy(f(k),build (k+1) )) in build 1;;
+  
+
+stm_peek 30 (fun_to_stream_bounded (fun x -> x+1) 20);;
+    
+(*** 2.5 ***)
+(*modele d'objets infini. construction des valeurs 'a la demande'.*)
+let rec fun_to_stream_unbounded f = 
+  let rec build k =
+    StmCons(lazy(f(k),build(k+1))) in build 1;;
+
+stm_peek 30 (fun_to_stream_unbounded (fun x -> x+1));;
+
+  
+(*** 2.6 ***)
+let rec stm_map f fl =
+  match fl with
+  |StmEmpty -> StmEmpty
+  |StmCons(lazy(u,v)) -> StmCons(lazy(f u, stm_map f v));; 
+  
+(*** 2.7 ***)
+let rec stm_compose f fl1 fl2 =
+  match (fl1, fl2) with
+  |(StmEmpty,StmEmpty) -> StmEmpty
+  |(StmCons(lazy(u1,v1)), StmCons(lazy(u2,v2))) ->
+           StmCons(lazy(((f u1 u2), (stm_compose f v1 v2))))
+  | _ -> failwith "impossible de composer";; (*sans cette condition, le matching n'est pas exhaustif pour le compilateur *)
+
+  
+(*** 2.8 ***)
+let rec stm_concat fl1 fl2 =
+  match fl1 with
+  |StmEmpty -> fl2
+  |StmCons(lazy(u,v)) -> StmCons(lazy(u, stm_concat v fl2));; 
+                          
+
